@@ -60,10 +60,11 @@ const dbDriver = await p.select({
 });
 
 const modules = await p.multiselect({
-  message: 'Optional modules',
+  message: 'Optional modules (space to toggle, enter to confirm)',
   options: [
     { value: 'doppler', label: 'Doppler secret management' },
     { value: 'resend', label: 'Resend email (transactional mail)' },
+    { value: 'docker', label: 'Docker (Dockerfile + .dockerignore)' },
   ],
   required: false,
 });
@@ -107,14 +108,29 @@ if (cloneDir !== targetDir) {
   rmSync(cloneDir, { recursive: true, force: true });
 }
 rmSync(join(targetDir, '.git'), { recursive: true, force: true });
+rmSync(join(targetDir, '.github'), { recursive: true, force: true }); // template-maintainer usage, not for scaffolded projects
+rmSync(join(targetDir, 'PUBLISHING.md'), { force: true }); // template-maintainer doc, not for scaffolded projects
+// Keep CHANGELOG.md but reset it — the cloned one is the template's own
+// version history, not the new project's.
+writeFileSync(join(targetDir, 'CHANGELOG.md'), '# Changelog\n\nAll notable changes to this project will be documented here.\n');
+if (!modules.includes('docker')) {
+  rmSync(join(targetDir, 'Dockerfile'), { force: true });
+  rmSync(join(targetDir, '.dockerignore'), { force: true });
+}
 await execa('git', ['init'], { cwd: targetDir });
 s.stop('Cloned');
+
+// --- doctor script ---
+// Not part of the template — this CLI's own env/DB-connection sanity check.
+const ownDoctorPath = fileURLToPath(new URL('./doctor.ts', import.meta.url));
+writeFileSync(join(targetDir, 'scripts/doctor.ts'), readFileSync(ownDoctorPath, 'utf-8'));
 
 // --- package.json ---
 const pkgPath = join(targetDir, 'package.json');
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
 pkg.name = pkgName;
 pkg.version = '0.1.0';
+pkg.scripts.doctor = 'bun --env-file=.env.development scripts/doctor.ts';
 delete pkg.publishConfig;
 delete pkg.repository;
 delete pkg.files;
@@ -145,9 +161,20 @@ s.start('Installing dependencies');
 await execa('bun', ['install'], { cwd: targetDir });
 s.stop('Installed');
 
+// --- squash migrations ---
+// The template ships its own dev migration history (one file per schema
+// change made while building it) — meaningless for a brand-new project.
+// Regenerate a single migration from the current schema instead. `generate`
+// only diffs the schema against the migrations folder, no DB connection needed.
+s.start('Squashing migrations into a single initial migration');
+rmSync(join(targetDir, 'server/drizzle'), { recursive: true, force: true });
+await execa('bunx', ['drizzle-kit', 'generate'], { cwd: targetDir });
+s.stop('Migrations squashed');
+
 const notes = ['Fill in DATABASE_URL (and Google OAuth vars if using them) in .env.development'];
 if (modules.includes('resend')) notes.push('Add RESEND_API_KEY to .env.development to send real email');
 if (modules.includes('doppler')) notes.push('Run `doppler setup` — see README "Secrets management with Doppler"');
+if (modules.includes('docker')) notes.push('docker build -t ' + pkgName + ' .   # see Dockerfile');
 notes.push('bun run doctor   # verify env + DB connection before migrating');
 notes.push('bun run migrate:dev');
 p.note(notes.join('\n'), 'Next steps');

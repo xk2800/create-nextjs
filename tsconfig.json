@@ -26,5 +26,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  // doctor.ts is a template asset copied into scaffolded projects, which have
+  // pg/@neondatabase/serverless as real dependencies — this CLI doesn't.
+  "exclude": ["src/doctor.ts"]
 }
