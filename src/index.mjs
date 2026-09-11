@@ -2,11 +2,15 @@
 import * as p from '@clack/prompts';
 import { execa } from 'execa';
 import { randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
 
 // Override for local testing: CREATE_NEXTJS_REPO=/path/to/local/clone
 const REPO = process.env.CREATE_NEXTJS_REPO || 'https://github.com/xk2800/nextjs-template.git';
+
+// Harmless artifacts (a stray .git from `git init`, editor/OS cruft) that
+// shouldn't block scaffolding into "." — same allowlist create-vite uses.
+const IGNORE_FILES = new Set(['.git', '.DS_Store', '.gitignore', '.gitattributes', '.idea', '.vscode', 'Thumbs.db']);
 
 p.intro('@xk2800/create-nextjs');
 
@@ -15,7 +19,9 @@ const targetDir = join(process.cwd(), projectName);
 const pkgName = projectName === '.' ? basename(resolve(targetDir)) : projectName;
 
 if (projectName === '.') {
-  if (readdirSync(targetDir).length > 0) { p.cancel(`${targetDir} is not empty`); process.exit(1); }
+  if (readdirSync(targetDir).some((f) => !IGNORE_FILES.has(f))) {
+    p.cancel(`${targetDir} is not empty`); process.exit(1);
+  }
 } else if (existsSync(targetDir)) {
   p.cancel(`${targetDir} already exists`); process.exit(1);
 }
@@ -38,10 +44,17 @@ const modules = await p.multiselect({
 });
 
 // --- clone ---
+// `git clone` refuses to write into a directory that already contains
+// anything — even just a stray .git from a prior `git init` or attempt. When
+// targetDir has ignorable leftovers, clone/extract into a scratch dir next to
+// them and merge in, instead of failing outright.
+const hasLeftovers = existsSync(targetDir) && readdirSync(targetDir).length > 0;
+const cloneDir = hasLeftovers ? join(targetDir, `.create-nextjs-${Date.now()}`) : targetDir;
+
 const s = p.spinner();
 s.start('Cloning template');
 try {
-  await execa('git', ['clone', '--depth', '1', REPO, targetDir]);
+  await execa('git', ['clone', '--depth', '1', REPO, cloneDir]);
 } catch (err) {
   if (err.code === 'ENOENT') {
     // git not available — fall back to a release tarball
@@ -52,14 +65,21 @@ try {
     });
     if (!res.ok) { s.stop('failed'); p.cancel(`download failed: ${res.status}`); process.exit(1); }
     writeFileSync('template.tar.gz', Buffer.from(await res.arrayBuffer()));
-    await execa('mkdir', ['-p', targetDir]);
-    await execa('tar', ['-xzf', 'template.tar.gz', '--strip-components=1', '-C', targetDir]);
+    await execa('mkdir', ['-p', cloneDir]);
+    await execa('tar', ['-xzf', 'template.tar.gz', '--strip-components=1', '-C', cloneDir]);
     rmSync('template.tar.gz');
   } else {
     s.stop('failed');
     p.cancel(err.message);
     process.exit(1);
   }
+}
+if (cloneDir !== targetDir) {
+  for (const entry of readdirSync(cloneDir)) {
+    if (entry === '.git') continue;
+    renameSync(join(cloneDir, entry), join(targetDir, entry));
+  }
+  rmSync(cloneDir, { recursive: true, force: true });
 }
 rmSync(join(targetDir, '.git'), { recursive: true, force: true });
 await execa('git', ['init'], { cwd: targetDir });
