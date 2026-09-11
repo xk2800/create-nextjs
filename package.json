@@ -5,6 +5,9 @@
   "bin": {
     "create-nextjs": "./src/index.mjs"
   },
+  "scripts": {
+    "release": "bun scripts/release.mjs"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/xk2800/create-nextjs.git"
