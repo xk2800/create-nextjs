@@ -4,6 +4,7 @@ import { execa } from 'execa';
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Override for local testing: CREATE_NEXTJS_REPO=/path/to/local/clone
 const REPO = process.env.CREATE_NEXTJS_REPO || 'https://github.com/xk2800/nextjs-template.git';
@@ -12,7 +13,31 @@ const REPO = process.env.CREATE_NEXTJS_REPO || 'https://github.com/xk2800/nextjs
 // shouldn't block scaffolding into "." — same allowlist create-vite uses.
 const IGNORE_FILES = new Set(['.git', '.DS_Store', '.gitignore', '.gitattributes', '.idea', '.vscode', 'Thumbs.db']);
 
+const ownPkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
+const ownPkg = JSON.parse(readFileSync(ownPkgPath, 'utf-8'));
+
 p.intro('@xk2800/create-nextjs');
+
+// npx/bunx can hand you a stale cached copy of this CLI — offer to re-run
+// with the real latest instead of silently scaffolding with old code.
+try {
+  const res = await fetch(`https://registry.npmjs.org/${ownPkg.name}/latest`);
+  if (res.ok) {
+    const { version: latest } = await res.json();
+    if (latest !== ownPkg.version) {
+      const useLatest = await p.confirm({
+        message: `A new version is available (${ownPkg.version} → ${latest}). Run that instead?`,
+      });
+      if (!p.isCancel(useLatest) && useLatest) {
+        const runner = process.versions.bun ? 'bunx' : 'npx';
+        const { exitCode } = await execa(runner, [`${ownPkg.name}@latest`], { stdio: 'inherit', reject: false });
+        process.exit(exitCode ?? 0);
+      }
+    }
+  }
+} catch {
+  // offline or registry unreachable — proceed with whatever version is running
+}
 
 const projectName = await p.text({ message: 'Project name', placeholder: 'my-app' });
 const targetDir = join(process.cwd(), projectName);
