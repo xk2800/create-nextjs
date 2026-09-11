@@ -10,7 +10,8 @@
     "url": "https://github.com/xk2800/create-nextjs.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   },
   "private": false,
   "files": [
