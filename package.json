@@ -5,18 +5,22 @@
   "bin": {
     "create-nextjs": "./src/index.mjs"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xk2800/create-nextjs.git"
+  },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
-  "private": true,
+  "private": false,
+  "files": [
+    "src"
+  ],
   "dependencies": {
     "@clack/prompts": "^0.9.0",
     "execa": "^9.5.0"
   },
   "devDependencies": {
     "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }
