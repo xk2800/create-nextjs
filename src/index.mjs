@@ -2,8 +2,8 @@
 import * as p from '@clack/prompts';
 import { execa } from 'execa';
 import { randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import { join, basename, resolve } from 'node:path';
 
 // Override for local testing: CREATE_NEXTJS_REPO=/path/to/local/clone
 const REPO = process.env.CREATE_NEXTJS_REPO || 'https://github.com/xk2800/nextjs-template.git';
@@ -12,7 +12,13 @@ p.intro('@xk2800/create-nextjs');
 
 const projectName = await p.text({ message: 'Project name', placeholder: 'my-app' });
 const targetDir = join(process.cwd(), projectName);
-if (existsSync(targetDir)) { p.cancel(`${targetDir} already exists`); process.exit(1); }
+const pkgName = projectName === '.' ? basename(resolve(targetDir)) : projectName;
+
+if (projectName === '.') {
+  if (readdirSync(targetDir).length > 0) { p.cancel(`${targetDir} is not empty`); process.exit(1); }
+} else if (existsSync(targetDir)) {
+  p.cancel(`${targetDir} already exists`); process.exit(1);
+}
 
 const dbDriver = await p.select({
   message: 'Database driver',
@@ -62,7 +68,7 @@ s.stop('Cloned');
 // --- package.json ---
 const pkgPath = join(targetDir, 'package.json');
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-pkg.name = projectName;
+pkg.name = pkgName;
 pkg.version = '0.1.0';
 delete pkg.publishConfig;
 delete pkg.repository;
