@@ -1,0 +1,103 @@
+#!/usr/bin/env node
+import * as p from '@clack/prompts';
+import { execa } from 'execa';
+import { randomBytes } from 'node:crypto';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+
+// Override for local testing: CREATE_NEXTJS_REPO=/path/to/local/clone
+const REPO = process.env.CREATE_NEXTJS_REPO || 'https://github.com/xk2800/nextjs-template.git';
+
+p.intro('@xk2800/create-nextjs');
+
+const projectName = await p.text({ message: 'Project name', placeholder: 'my-app' });
+const targetDir = join(process.cwd(), projectName);
+if (existsSync(targetDir)) { p.cancel(`${targetDir} already exists`); process.exit(1); }
+
+const dbDriver = await p.select({
+  message: 'Database driver',
+  options: [
+    { value: 'pg', label: 'pg — local/self-hosted Postgres (Docker)' },
+    { value: 'neon', label: 'neon — Neon serverless (production)' },
+  ],
+});
+
+const modules = await p.multiselect({
+  message: 'Optional modules',
+  options: [
+    { value: 'doppler', label: 'Doppler secret management' },
+    { value: 'resend', label: 'Resend email (transactional mail)' },
+  ],
+  required: false,
+});
+
+// --- clone ---
+const s = p.spinner();
+s.start('Cloning template');
+try {
+  await execa('git', ['clone', '--depth', '1', REPO, targetDir]);
+} catch (err) {
+  if (err.code === 'ENOENT') {
+    // git not available — fall back to a release tarball
+    s.message('git not found, downloading release tarball');
+    const res = await fetch('https://api.github.com/repos/xk2800/nextjs-template/tarball/master', {
+      headers: process.env.GITHUB_TOKEN ? { Authorization: `token ${process.env.GITHUB_TOKEN}` } : {},
+      redirect: 'follow',
+    });
+    if (!res.ok) { s.stop('failed'); p.cancel(`download failed: ${res.status}`); process.exit(1); }
+    writeFileSync('template.tar.gz', Buffer.from(await res.arrayBuffer()));
+    await execa('mkdir', ['-p', targetDir]);
+    await execa('tar', ['-xzf', 'template.tar.gz', '--strip-components=1', '-C', targetDir]);
+    rmSync('template.tar.gz');
+  } else {
+    s.stop('failed');
+    p.cancel(err.message);
+    process.exit(1);
+  }
+}
+rmSync(join(targetDir, '.git'), { recursive: true, force: true });
+await execa('git', ['init'], { cwd: targetDir });
+s.stop('Cloned');
+
+// --- package.json ---
+const pkgPath = join(targetDir, 'package.json');
+const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+pkg.name = projectName;
+pkg.version = '0.1.0';
+delete pkg.publishConfig;
+delete pkg.repository;
+delete pkg.files;
+delete pkg.sideEffects;
+writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+
+// --- .env.development ---
+// Built against the template's real .env.development.example, not assumed
+// key names: the secret var is BETTER_AUTH_SECRET, there is no DB_DRIVER line
+// (it's a zod default of "pg", only written here when overridden), and
+// BETTER_AUTH_URL/BASE_URL ship blank — leaving them blank breaks the OAuth
+// callback on first `bun dev`, so prefill localhost.
+const port = 3000;
+const authSecret = randomBytes(32).toString('base64');
+let env = readFileSync(join(targetDir, '.env.development.example'), 'utf-8');
+env = env
+  .replace(/^PORT=$/m, `PORT=${port}`)
+  .replace(/^BASE_URL=$/m, `BASE_URL=http://localhost:${port}`)
+  .replace(/^BETTER_AUTH_URL=$/m, `BETTER_AUTH_URL=http://localhost:${port}`)
+  .replace(/^BETTER_AUTH_SECRET=$/m, `BETTER_AUTH_SECRET=${authSecret}`);
+if (dbDriver !== 'pg') {
+  env = env.replace(/^DATABASE_URL=$/m, `DATABASE_URL=\nDB_DRIVER=${dbDriver}`);
+}
+writeFileSync(join(targetDir, '.env.development'), env);
+
+// --- install ---
+s.start('Installing dependencies');
+await execa('bun', ['install'], { cwd: targetDir });
+s.stop('Installed');
+
+const notes = ['Fill in DATABASE_URL (and Google OAuth vars if using them) in .env.development'];
+if (modules.includes('resend')) notes.push('Add RESEND_API_KEY to .env.development to send real email');
+if (modules.includes('doppler')) notes.push('Run `doppler setup` — see README "Secrets management with Doppler"');
+notes.push('bun run doctor   # verify env + DB connection before migrating');
+notes.push('bun run migrate:dev');
+p.note(notes.join('\n'), 'Next steps');
+p.outro(`cd ${projectName} && bun dev`);

@@ -1,0 +1,22 @@
+{
+  "name": "@xk2800/create-nextjs",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "create-nextjs": "./src/index.mjs"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "private": true,
+  "dependencies": {
+    "@clack/prompts": "^0.9.0",
+    "execa": "^9.5.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
