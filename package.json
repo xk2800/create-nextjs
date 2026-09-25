@@ -1,6 +1,6 @@
 {
   "name": "@xk2800/create-nextjs",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "bin": {
     "create-nextjs": "./src/index.mjs"
