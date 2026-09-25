@@ -229,6 +229,12 @@ rmSync(join(targetDir, 'server/drizzle'), { recursive: true, force: true });
 await execa('bunx', ['drizzle-kit', 'generate'], { cwd: targetDir });
 s.stop('Migrations squashed');
 
+// --- initial commit ---
+// reject: false — a missing git user.name/email shouldn't abort a finished scaffold.
+await execa('git', ['add', '-A'], { cwd: targetDir });
+const commit = await execa('git', ['commit', '-m', 'initial commit'], { cwd: targetDir, reject: false });
+if (commit.exitCode !== 0) p.log.warn(`Skipped initial commit: ${commit.stderr || commit.stdout}`);
+
 const notes = ['Fill in DATABASE_URL (and Google OAuth vars if using them) in .env.development'];
 if (modules.includes('resend')) notes.push('Add RESEND_API_KEY to .env.development to send real email');
 if (modules.includes('doppler')) notes.push('Run `doppler setup` — see README "Secrets management with Doppler"');
