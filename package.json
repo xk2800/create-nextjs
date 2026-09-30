@@ -3,7 +3,9 @@
   "version": "0.1.4",
   "type": "module",
   "bin": {
-    "create-nextjs": "./src/index.mjs"
+    "create-nextjs": "./src/index.mjs",
+    "create-nextjs-beta": "./src/beta.mjs",
+    "create-nextjs-beta-local": "./src/beta-local.mjs"
   },
   "scripts": {
     "release": "bun scripts/release.mjs"
