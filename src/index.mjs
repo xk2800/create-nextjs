@@ -79,7 +79,8 @@ try {
   // offline or registry unreachable — proceed with whatever version is running
 }
 
-const projectName = await p.text({ message: 'Project name', placeholder: 'my-app' });
+const projectName = await p.text({ message: 'Project name', placeholder: 'my-app', defaultValue: 'my-app' });
+if (p.isCancel(projectName)) { p.cancel('Cancelled'); process.exit(0); }
 const targetDir = join(process.cwd(), projectName);
 const pkgName = projectName === '.' ? basename(resolve(targetDir)) : projectName;
 
@@ -175,6 +176,9 @@ writeFileSync(join(targetDir, 'scripts/doctor.ts'), readFileSync(ownDoctorPath, 
 // --- package.json ---
 const pkgPath = join(targetDir, 'package.json');
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+// Depend on the template version we just cloned, so `bun update
+// @xk2800/nextjs-template` is how a scaffolded app picks up template changes.
+pkg.dependencies = { ...pkg.dependencies, '@xk2800/nextjs-template': `^${pkg.version}` };
 pkg.name = pkgName;
 pkg.version = '0.1.0';
 pkg.scripts.doctor = 'bun --env-file=.env.development scripts/doctor.ts';
@@ -183,6 +187,9 @@ pkg.scripts.typecheck = 'tsc --noEmit';
 delete pkg.scripts['bump-version'];
 delete pkg.scripts['build:lib'];
 delete pkg.scripts.prepublishOnly;
+if (!modules.includes('doppler')) {
+  for (const name of Object.keys(pkg.scripts)) if (name.endsWith(':doppler')) delete pkg.scripts[name];
+}
 delete pkg.devDependencies?.tsup;
 delete pkg.publishConfig;
 delete pkg.repository;
