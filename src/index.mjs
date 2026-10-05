@@ -2,7 +2,7 @@
 import * as p from '@clack/prompts';
 import { execa } from 'execa';
 import { randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, rmSync, cpSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, renameSync, rmSync, cpSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,7 +33,8 @@ function shim(file, specifier) {
 
 // Local source files the published package provides, as [file, specifier]:
 // tsup entries (built to dist/), plain .ts subpath exports, and every
-// component under the shipped `components/*` dirs (exported as `./components/*`).
+// component under the shipped `components/*` entries (exported as `./components/*`).
+// A `files` entry can be a directory or a single .tsx file.
 function packageProvidedFiles(dir, tplPkg) {
   const provided = [];
   const tsup = readFileSync(join(dir, 'tsup.config.ts'), 'utf-8');
@@ -44,11 +45,11 @@ function packageProvidedFiles(dir, tplPkg) {
     if (typeof val === 'string' && val.endsWith('.ts')) provided.push([val.slice(2), `${TEMPLATE_PKG}/${key.slice(2)}`]);
   }
   const walk = (rel) => {
-    for (const e of readdirSync(join(dir, rel), { withFileTypes: true })) {
-      const r = `${rel}/${e.name}`;
-      if (e.isDirectory()) walk(r);
-      else if (r.endsWith('.tsx')) provided.push([r, `${TEMPLATE_PKG}/${r.slice(0, -4)}`]);
+    if (!statSync(join(dir, rel)).isDirectory()) {
+      if (rel.endsWith('.tsx')) provided.push([rel, `${TEMPLATE_PKG}/${rel.slice(0, -4)}`]);
+      return;
     }
+    for (const e of readdirSync(join(dir, rel))) walk(`${rel}/${e}`);
   };
   for (const f of tplPkg.files ?? []) if (f.startsWith('components/') && existsSync(join(dir, f))) walk(f);
   return provided.filter(([f]) => existsSync(join(dir, f)));
@@ -192,17 +193,23 @@ rmSync(join(targetDir, 'tsconfig.build.json'), { force: true });
 // Keep CHANGELOG.md but reset it — the cloned one is the template's own
 // version history, not the new project's.
 writeFileSync(join(targetDir, 'CHANGELOG.md'), '# Changelog\n\nAll notable changes to this project will be documented here.\n');
+// The /features page showcases the template itself, not the new project —
+// drop it and every link to it (the landing-page button, header, footer).
+rmSync(join(targetDir, 'app/features'), { recursive: true, force: true });
+for (const [file, pattern] of [
+  ['app/page.tsx', /\s*<Button asChild variant="outline">\s*<Link href="\/features">[\s\S]*?<\/Button>/],
+  ['components/site/site-header.tsx', /\s*<Link\s+href="\/features"[\s\S]*?<\/Link>/],
+  ['components/site/site-footer.tsx', /\s*<Link\s+href="\/features"[\s\S]*?<\/Link>/],
+]) {
+  const path = join(targetDir, file);
+  if (existsSync(path)) writeFileSync(path, readFileSync(path, 'utf-8').replace(pattern, ''));
+}
 if (!modules.includes('docker')) {
   rmSync(join(targetDir, 'Dockerfile'), { force: true });
   rmSync(join(targetDir, '.dockerignore'), { force: true });
 }
 await execa('git', ['init'], { cwd: targetDir });
 s.stop('Cloned');
-
-// --- doctor script ---
-// Not part of the template — this CLI's own env/DB-connection sanity check.
-const ownDoctorPath = fileURLToPath(new URL('./doctor.ts', import.meta.url));
-writeFileSync(join(targetDir, 'scripts/doctor.ts'), readFileSync(ownDoctorPath, 'utf-8'));
 
 // --- package.json ---
 const pkgPath = join(targetDir, 'package.json');
@@ -283,7 +290,7 @@ const notes = ['Fill in DATABASE_URL (and Google OAuth vars if using them) in .e
 if (modules.includes('resend')) notes.push('Add RESEND_API_KEY to .env.development to send real email');
 if (modules.includes('doppler')) notes.push('Run `doppler setup` — see README "Secrets management with Doppler"');
 if (modules.includes('docker')) notes.push('docker build -t ' + pkgName + ' .   # see Dockerfile');
-notes.push('bun run doctor   # verify env + DB connection before migrating');
+notes.push('bun run doctor   # verify env, DB connection and pending migrations');
 notes.push('bun run migrate:dev');
 notes.push(`Template updates: bun update ${TEMPLATE_PKG}, then bun run generate if the schema changed`);
 p.note(notes.join('\n'), 'Next steps');

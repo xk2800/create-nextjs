@@ -29,7 +29,7 @@ It clones the template, strips `.git` and reinitializes it, rewrites `package.js
 ```bash
 cd <project-name>
 # fill in DATABASE_URL (and Google OAuth vars if using that provider) in .env.development
-bun run doctor        # confirms env + DB connection before you touch migrations
+bun run doctor        # checks env, auth secret, DB connection and pending migrations
 bun run migrate:dev
 bun dev
 ```
