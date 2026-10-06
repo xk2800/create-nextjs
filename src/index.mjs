@@ -173,6 +173,7 @@ if (cloneDir !== targetDir) {
 rmSync(join(targetDir, '.git'), { recursive: true, force: true });
 rmSync(join(targetDir, '.github'), { recursive: true, force: true }); // template-maintainer usage, not for scaffolded projects
 rmSync(join(targetDir, 'PUBLISHING.md'), { force: true }); // template-maintainer doc, not for scaffolded projects
+rmSync(join(targetDir, 'docs'), { recursive: true, force: true }); // the template's own docs site, not for scaffolded projects
 rmSync(join(targetDir, 'scripts/bump-version.ts'), { force: true }); // template-maintainer tool, not for scaffolded projects
 rmSync(join(targetDir, 'scripts/bump-version.test.ts'), { force: true });
 const tplPkg = JSON.parse(readFileSync(join(targetDir, 'package.json'), 'utf-8'));
@@ -221,6 +222,7 @@ pkg.scripts.doctor = 'bun --env-file=.env.development scripts/doctor.ts';
 pkg.scripts.build = 'next build';
 pkg.scripts.typecheck = 'tsc --noEmit';
 delete pkg.scripts['bump-version'];
+delete pkg.scripts['docs:dev'];
 if (pkg.scripts.test) pkg.scripts.test = pkg.scripts.test.replace(' && bun scripts/bump-version.test.ts', '');
 delete pkg.scripts['build:lib'];
 delete pkg.scripts.prepublishOnly;
