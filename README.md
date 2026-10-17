@@ -34,6 +34,20 @@ bun run migrate:dev
 bun dev
 ```
 
+## Upgrading the template in an existing app
+
+Run from the app's root folder:
+
+```bash
+bunx @xk2800/create-nextjs upgrade            # latest release
+bunx @xk2800/create-nextjs upgrade 0.9.0      # a specific version
+bunx -p @xk2800/create-nextjs create-nextjs-beta upgrade   # latest beta
+```
+
+It bumps `@xk2800/nextjs-template` (keeping your `^`/exact pin style), runs `drizzle-kit generate` so any template schema change gets its own migration, offers to apply it with your `migrate:dev` / `db:migrate` script (off by default — it touches the database), then type-checks the app so breaking API changes show up immediately.
+
+To try unpublished template changes in a real app first, run `create-nextjs-beta-local upgrade` from this repo's checkout (`bun /path/to/create-nextjs/src/beta-local.mjs upgrade`). It packs `../nextjs-template` and installs it as a `file:` dependency — don't commit that; run a normal `upgrade` once the template is published.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

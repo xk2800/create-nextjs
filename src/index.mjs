@@ -73,13 +73,18 @@ if (!LOCAL) try {
       });
       if (!p.isCancel(useLatest) && useLatest) {
         const runner = process.versions.bun ? 'bunx' : 'npx';
-        const { exitCode } = await execa(runner, [`${ownPkg.name}@latest`], { stdio: 'inherit', reject: false });
+        const { exitCode } = await execa(runner, [`${ownPkg.name}@latest`, ...process.argv.slice(2)], { stdio: 'inherit', reject: false });
         process.exit(exitCode ?? 0);
       }
     }
   }
 } catch {
   // offline or registry unreachable — proceed with whatever version is running
+}
+
+if (process.argv[2] === 'upgrade') {
+  await import('./upgrade.mjs');
+  process.exit(0);
 }
 
 const projectName = await p.text({ message: 'Project name', placeholder: 'my-app', defaultValue: 'my-app' });
@@ -294,6 +299,6 @@ if (modules.includes('doppler')) notes.push('Run `doppler setup` — see README 
 if (modules.includes('docker')) notes.push('docker build -t ' + pkgName + ' .   # see Dockerfile');
 notes.push('bun run doctor   # verify env, DB connection and pending migrations');
 notes.push('bun run migrate:dev');
-notes.push(`Template updates: bun update ${TEMPLATE_PKG}, then bun run generate if the schema changed`);
+notes.push('Template updates: bunx @xk2800/create-nextjs upgrade');
 p.note(notes.join('\n'), 'Next steps');
 p.outro(`cd ${projectName} && bun dev`);
