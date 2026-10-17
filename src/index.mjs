@@ -181,6 +181,18 @@ rmSync(join(targetDir, 'PUBLISHING.md'), { force: true }); // template-maintaine
 rmSync(join(targetDir, 'docs'), { recursive: true, force: true }); // the template's own docs site, not for scaffolded projects
 rmSync(join(targetDir, 'scripts/bump-version.ts'), { force: true }); // template-maintainer tool, not for scaffolded projects
 rmSync(join(targetDir, 'scripts/bump-version.test.ts'), { force: true });
+// The template's Storybook (stories + mocks of its internals) — not for scaffolded projects.
+rmSync(join(targetDir, '.storybook'), { recursive: true, force: true });
+rmSync(join(targetDir, 'stories'), { recursive: true, force: true });
+// Template-maintainer docs, release assets and QA scripts — not for scaffolded projects.
+for (const f of ['SPEC.md', 'REVIEW-CHECKLIST.md', 'features-test.md', 'Dockerfile-old', 'Dockerfile.storybook',
+  'scripts/loadtest-throttle.ts', 'scripts/test-2fa.ts', 'scripts/test-new-device.ts']) rmSync(join(targetDir, f), { force: true });
+rmSync(join(targetDir, 'brag-output'), { recursive: true, force: true });
+for (const file of ['README.md', 'CLAUDE.md']) {
+  const path = join(targetDir, file);
+  // Also drop CLAUDE.md's "update docs/SPEC/features-test" rule — it points at files deleted above.
+  if (existsSync(path)) writeFileSync(path, readFileSync(path, 'utf-8').replace(/^.*bun run storybook.*\n/gm, '').replace(/^3\. Any feature added, changed or removed:.*\n/m, ''));
+}
 const tplPkg = JSON.parse(readFileSync(join(targetDir, 'package.json'), 'utf-8'));
 for (const [file, specifier] of packageProvidedFiles(targetDir, tplPkg)) shim(join(targetDir, file), specifier);
 // The package ships its components as .tsx source, so Next must compile them,
@@ -199,6 +211,18 @@ rmSync(join(targetDir, 'tsconfig.build.json'), { force: true });
 // Keep CHANGELOG.md but reset it — the cloned one is the template's own
 // version history, not the new project's.
 writeFileSync(join(targetDir, 'CHANGELOG.md'), '# Changelog\n\nAll notable changes to this project will be documented here.\n');
+// data/changelog.json feeds /changelog and the UpdateModal; the cloned one is the
+// template's release history. Reseed it (UpdateModal reads changelog[0], so not []),
+// and drop the template's older history page.
+rmSync(join(targetDir, 'app/changelog-template'), { recursive: true, force: true });
+rmSync(join(targetDir, 'data/changelog-template.json'), { force: true });
+writeFileSync(join(targetDir, 'data/changelog.json'), JSON.stringify([{
+  version: '0.1.0',
+  date: new Date().toISOString().slice(0, 10),
+  type: 'feature',
+  title: 'Initial release',
+  changes: ['Project created with @xk2800/create-nextjs'],
+}], null, 2) + '\n');
 // The /features page showcases the template itself, not the new project —
 // drop it and every link to it (the landing-page button, header, footer).
 rmSync(join(targetDir, 'app/features'), { recursive: true, force: true });
@@ -235,6 +259,9 @@ if (!modules.includes('doppler')) {
   for (const name of Object.keys(pkg.scripts)) if (name.endsWith(':doppler')) delete pkg.scripts[name];
 }
 delete pkg.devDependencies?.tsup;
+delete pkg.scripts.storybook;
+delete pkg.scripts['build-storybook'];
+for (const dep of ['storybook', '@storybook/nextjs-vite', '@storybook/addon-docs', 'vite']) delete pkg.devDependencies?.[dep];
 delete pkg.publishConfig;
 delete pkg.repository;
 delete pkg.files;
