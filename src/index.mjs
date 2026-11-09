@@ -15,7 +15,7 @@ const IGNORE_FILES = new Set(['.git', '.DS_Store', '.gitignore', '.gitattributes
 
 const TEMPLATE_PKG = '@xk2800/nextjs-template';
 // npm dist-tag to scaffold from; `create-nextjs-beta` sets this to "beta".
-const TEMPLATE_TAG = process.env.CREATE_NEXTJS_TAG || 'latest';
+const TEMPLATE_TAG = process.env.CREATE_NEXTJS_TAG || (process.argv.includes('--beta') ? 'beta' : 'latest');
 // Local template working copy to scaffold from instead of npm/GitHub;
 // `create-nextjs-beta-local` sets this. Uncommitted changes are included.
 const LOCAL = process.env.CREATE_NEXTJS_LOCAL && resolve(process.env.CREATE_NEXTJS_LOCAL);

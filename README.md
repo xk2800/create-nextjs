@@ -17,6 +17,8 @@ npx @xk2800/create-nextjs
 bunx @xk2800/create-nextjs
 ```
 
+Add `--beta` (`bunx @xk2800/create-nextjs --beta`) to scaffold from the template's latest beta instead of the stable release.
+
 Run it from the parent directory you want the new project folder created in. You'll be prompted for:
 - **Project name** — becomes the folder name and `package.json` name.
 - **Database driver** — `pg` (local/self-hosted Postgres) or `neon` (Neon serverless).
