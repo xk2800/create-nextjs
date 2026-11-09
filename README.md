@@ -20,6 +20,7 @@ bunx @xk2800/create-nextjs
 Run it from the parent directory you want the new project folder created in. You'll be prompted for:
 - **Project name** — becomes the folder name and `package.json` name.
 - **Database driver** — `pg` (local/self-hosted Postgres) or `neon` (Neon serverless).
+- **First admin email** — optional. Written to `ADMIN_EMAIL` in `.env.development`; the account that signs up with it becomes the first admin (see below).
 - **Optional modules** — Doppler secrets, Resend email.
 
 It clones the template, strips `.git` and reinitializes it, rewrites `package.json`, generates a fresh `BETTER_AUTH_SECRET`, and runs `bun install` for you.
@@ -33,6 +34,10 @@ bun run doctor        # checks env, auth secret, DB connection and pending migra
 bun run migrate:dev
 bun dev
 ```
+
+## First admin
+
+If you entered an admin email, sign in with it and that account is promoted to admin. **Google sign-in is the reliable route**, since Google reports the email as verified. Email/password only works if you can receive the verification email (needs `RESEND_API_KEY`) and click the link. If you sign up with email/password and *don't* verify, then later sign in with Google using the same address, you are **not** promoted, so sign in with Google first. This only works while no admin exists yet. Once you're in, **delete `ADMIN_EMAIL`** from `.env.development` and any deployed env, since it's only needed once. Leaving the prompt blank skips all of this and you can set the role in the database by hand.
 
 ## Upgrading the template in an existing app
 

@@ -108,6 +108,14 @@ const dbDriver = await p.select({
   ],
 });
 
+const adminEmail = await p.text({
+  message: 'Email for the first admin account (leave blank to skip)',
+  placeholder: 'you@example.com',
+  defaultValue: '',
+  validate: (v) => (v && !/^\S+@\S+\.\S+$/.test(v) ? 'Enter a valid email' : undefined),
+});
+if (p.isCancel(adminEmail)) { p.cancel('Cancelled'); process.exit(0); }
+
 const modules = await p.multiselect({
   message: 'Optional modules (space to toggle, enter to confirm)',
   options: [
@@ -290,6 +298,7 @@ env = env
 if (dbDriver !== 'pg') {
   env = env.replace(/^DATABASE_URL=$/m, `DATABASE_URL=\nDB_DRIVER=${dbDriver}`);
 }
+if (adminEmail) env = env.replace(/^ADMIN_EMAIL=$/m, `ADMIN_EMAIL=${adminEmail}`);
 writeFileSync(join(targetDir, '.env.development'), env);
 
 // --- install ---
@@ -317,13 +326,14 @@ s.stop('Migrations squashed');
 // --- initial commit ---
 // reject: false — a missing git user.name/email shouldn't abort a finished scaffold.
 await execa('git', ['add', '-A'], { cwd: targetDir });
-const commit = await execa('git', ['commit', '-m', 'initial commit'], { cwd: targetDir, reject: false });
+const commit = await execa('git', ['commit', '-m', 'Initial commit'], { cwd: targetDir, reject: false });
 if (commit.exitCode !== 0) p.log.warn(`Skipped initial commit: ${commit.stderr || commit.stdout}`);
 
 const notes = ['Fill in DATABASE_URL (and Google OAuth vars if using them) in .env.development'];
 if (modules.includes('resend')) notes.push('Add RESEND_API_KEY to .env.development to send real email');
 if (modules.includes('doppler')) notes.push('Run `doppler setup` — see README "Secrets management with Doppler"');
 if (modules.includes('docker')) notes.push('docker build -t ' + pkgName + ' .   # see Dockerfile');
+if (adminEmail) notes.push(`Sign in as ${adminEmail} with Google (email/password only works after you verify the email, which needs RESEND_API_KEY) to become admin, then delete ADMIN_EMAIL from .env.development and your deployed env — it's only needed once`);
 notes.push('bun run doctor   # verify env, DB connection and pending migrations');
 notes.push('bun run migrate:dev');
 notes.push('Template updates: bunx @xk2800/create-nextjs upgrade');
