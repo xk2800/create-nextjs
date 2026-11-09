@@ -333,7 +333,11 @@ const notes = ['Fill in DATABASE_URL (and Google OAuth vars if using them) in .e
 if (modules.includes('resend')) notes.push('Add RESEND_API_KEY to .env.development to send real email');
 if (modules.includes('doppler')) notes.push('Run `doppler setup` — see README "Secrets management with Doppler"');
 if (modules.includes('docker')) notes.push('docker build -t ' + pkgName + ' .   # see Dockerfile');
-if (adminEmail) notes.push(`Sign in as ${adminEmail} with Google (email/password only works after you verify the email, which needs RESEND_API_KEY) to become admin, then delete ADMIN_EMAIL from .env.development and your deployed env — it's only needed once`);
+if (adminEmail) notes.push(
+  `Sign in as ${adminEmail} with Google to become admin`,
+  '  (email/password: verify the email first, needs RESEND_API_KEY)',
+  '  then delete ADMIN_EMAIL from your env, it is only needed once',
+);
 notes.push('bun run doctor   # verify env, DB connection and pending migrations');
 notes.push('bun run migrate:dev');
 notes.push('Template updates: bunx @xk2800/create-nextjs upgrade');
