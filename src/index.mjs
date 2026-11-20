@@ -363,6 +363,6 @@ p.outro(`cd ${projectName} && bun dev`);
   s.stop('failed');
   // "." is the user's own directory — never delete it.
   if (projectName !== '.') rmSync(targetDir, { recursive: true, force: true });
-  p.cancel(err.shortMessage || err.message);
+  p.cancel([err.shortMessage || err.message, err.stderr].filter(Boolean).join('\n'));
   process.exit(1);
 }
