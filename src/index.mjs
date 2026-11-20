@@ -68,7 +68,7 @@ if (!LOCAL) try {
       });
       if (!p.isCancel(useLatest) && useLatest) {
         const runner = process.versions.bun ? 'bunx' : 'npx';
-        const { exitCode } = await execa(runner, [`${ownPkg.name}@latest`, ...process.argv.slice(2)], { stdio: 'inherit', reject: false });
+        const { exitCode } = await execa(runner, [`${ownPkg.name}@latest`, ...process.argv.slice(2)], { stdio: 'inherit', reject: false, env: { CREATE_NEXTJS_TAG: TEMPLATE_TAG } });
         process.exit(exitCode ?? 0);
       }
     }
