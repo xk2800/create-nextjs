@@ -12,10 +12,7 @@ import { execa } from 'execa';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const TEMPLATE_PKG = '@xk2800/nextjs-template';
-const TEMPLATE_TAG = process.env.CREATE_NEXTJS_TAG || (process.argv.includes('--beta') ? 'beta' : 'latest');
-const LOCAL = process.env.CREATE_NEXTJS_LOCAL;
-const LOCAL_TGZ = 'nextjs-template-local.tgz';
+import { TEMPLATE_PKG, TEMPLATE_TAG, LOCAL, LOCAL_TGZ, packLocal } from './common.mjs';
 
 const cwd = process.cwd();
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf-8'));
@@ -62,8 +59,7 @@ const s = p.spinner();
 // --- install ---
 if (LOCAL) {
   s.start('Building local template package');
-  await execa('bun', ['run', 'build:lib'], { cwd: LOCAL });
-  await execa('bun', ['pm', 'pack', '--filename', join(cwd, LOCAL_TGZ)], { cwd: LOCAL });
+  await packLocal(cwd);
   s.stop('Built');
 }
 s.start('Installing');

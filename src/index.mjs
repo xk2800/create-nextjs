@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, renameSync, rmSync, cpSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { TEMPLATE_PKG, TEMPLATE_TAG, LOCAL, LOCAL_TGZ, packLocal } from './common.mjs';
 
 // Override for local testing: CREATE_NEXTJS_REPO=/path/to/local/clone
 const REPO = process.env.CREATE_NEXTJS_REPO || 'https://github.com/xk2800/nextjs-template.git';
@@ -13,13 +14,6 @@ const REPO = process.env.CREATE_NEXTJS_REPO || 'https://github.com/xk2800/nextjs
 // shouldn't block scaffolding into "." — same allowlist create-vite uses.
 const IGNORE_FILES = new Set(['.git', '.DS_Store', '.gitignore', '.gitattributes', '.idea', '.vscode', 'Thumbs.db']);
 
-const TEMPLATE_PKG = '@xk2800/nextjs-template';
-// npm dist-tag to scaffold from; `create-nextjs-beta` sets this to "beta".
-const TEMPLATE_TAG = process.env.CREATE_NEXTJS_TAG || (process.argv.includes('--beta') ? 'beta' : 'latest');
-// Local template working copy to scaffold from instead of npm/GitHub;
-// `create-nextjs-beta-local` sets this. Uncommitted changes are included.
-const LOCAL = process.env.CREATE_NEXTJS_LOCAL && resolve(process.env.CREATE_NEXTJS_LOCAL);
-const LOCAL_TGZ = 'nextjs-template-local.tgz';
 
 // Scaffolded apps depend on the template package, so a version bump is how
 // they get fixes. Every local file the package also provides is replaced by a
@@ -321,10 +315,8 @@ writeFileSync(join(targetDir, '.env.development'), env);
 
 // --- install ---
 if (LOCAL) {
-  // Pack exactly what `npm publish` would ship, and install that.
   s.start('Building local template package');
-  await execa('bun', ['run', 'build:lib'], { cwd: LOCAL });
-  await execa('bun', ['pm', 'pack', '--filename', join(targetDir, LOCAL_TGZ)], { cwd: LOCAL });
+  await packLocal(targetDir);
   s.stop('Built');
 }
 s.start('Installing dependencies');
