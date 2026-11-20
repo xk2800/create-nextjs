@@ -33,9 +33,11 @@ function shim(file, specifier) {
 function packageProvidedFiles(dir, tplPkg) {
   const provided = [];
   const tsup = readFileSync(join(dir, 'tsup.config.ts'), 'utf-8');
-  for (const [, sub, src] of tsup.matchAll(/"([^"]+)":\s*"([^"]+\.ts)"/g)) {
+  for (const [, sub, src] of tsup.matchAll(/["']([^"']+)["']\s*:\s*["']([^"']+\.ts)["']/g)) {
     provided.push([src, `${TEMPLATE_PKG}/${sub.replace(/\/index$/, '')}`]);
   }
+  // An empty match means the config format changed: fail rather than ship apps with no shims (no update path).
+  if (!provided.length) throw new Error('Template changed: no entries found in tsup.config.ts. Please report this.');
   for (const [key, val] of Object.entries(tplPkg.exports ?? {})) {
     if (typeof val === 'string' && val.endsWith('.ts')) provided.push([val.slice(2), `${TEMPLATE_PKG}/${key.slice(2)}`]);
   }
