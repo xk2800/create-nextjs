@@ -13,7 +13,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const TEMPLATE_PKG = '@xk2800/nextjs-template';
-const TEMPLATE_TAG = process.env.CREATE_NEXTJS_TAG || 'latest';
+const TEMPLATE_TAG = process.env.CREATE_NEXTJS_TAG || (process.argv.includes('--beta') ? 'beta' : 'latest');
 const LOCAL = process.env.CREATE_NEXTJS_LOCAL;
 const LOCAL_TGZ = 'nextjs-template-local.tgz';
 
@@ -34,7 +34,7 @@ const current = existsSync(installedPath) ? readJson(installedPath).version : sp
 let target;
 if (LOCAL) {
   target = readJson(join(LOCAL, 'package.json')).version;
-} else if (process.argv[3]) {
+} else if (process.argv[3] && !process.argv[3].startsWith('-')) {
   target = process.argv[3].replace(/^v/, '');
 } else {
   try {
@@ -88,15 +88,12 @@ if (drizzleConfig) {
   const outDir = join(cwd, readFileSync(join(cwd, drizzleConfig), 'utf-8').match(/out:\s*["'`](.+?)["'`]/)?.[1] ?? './drizzle');
   const sqlFiles = () => (existsSync(outDir) ? readdirSync(outDir).filter((f) => f.endsWith('.sql')) : []);
   const before = new Set(sqlFiles());
-  s.start('Checking for schema changes');
-  const gen = await execa('bunx', ['drizzle-kit', 'generate'], { cwd, reject: false });
+  // No spinner and inherited stdio: drizzle-kit may ask "was this column renamed?".
+  p.log.step('Checking for schema changes');
+  const gen = await execa('bunx', ['drizzle-kit', 'generate'], { cwd, stdio: 'inherit', reject: false });
   newMigrations = sqlFiles().filter((f) => !before.has(f));
-  if (gen.exitCode !== 0) {
-    s.stop('drizzle-kit generate failed');
-    p.log.error(gen.stderr || gen.stdout);
-  } else {
-    s.stop(newMigrations.length ? `New migration: ${newMigrations.join(', ')}` : 'No schema changes');
-  }
+  if (gen.exitCode !== 0) p.log.error('drizzle-kit generate failed (output above)');
+  else p.log.success(newMigrations.length ? `New migration: ${newMigrations.join(', ')}` : 'No schema changes');
 
   // Applying touches a real database, so it's opt-in and uses the app's own script.
   const migrateScript = ['migrate:dev', 'db:migrate', 'migrate'].find((name) => pkg.scripts?.[name]);
