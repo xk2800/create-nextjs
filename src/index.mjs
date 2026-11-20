@@ -64,7 +64,7 @@ p.intro(`@xk2800/create-nextjs${LOCAL ? ` (template: ${LOCAL})` : TEMPLATE_TAG =
 // with the real latest instead of silently scaffolding with old code.
 // Skipped in local mode: that's testing this checkout, not the published CLI.
 if (!LOCAL) try {
-  const res = await fetch(`https://registry.npmjs.org/${ownPkg.name}/latest`);
+  const res = await fetch(`https://registry.npmjs.org/${ownPkg.name}/latest`, { signal: AbortSignal.timeout(5000) });
   if (res.ok) {
     const { version: latest } = await res.json();
     if (latest !== ownPkg.version) {
@@ -159,7 +159,7 @@ if (LOCAL) {
     if (f && existsSync(join(LOCAL, f))) cpSync(join(LOCAL, f), join(cloneDir, f));
   }
 } else try {
-  const res = await fetch(`https://registry.npmjs.org/${TEMPLATE_PKG}/${TEMPLATE_TAG}`);
+  const res = await fetch(`https://registry.npmjs.org/${TEMPLATE_PKG}/${TEMPLATE_TAG}`, { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`registry responded ${res.status}`);
   templateVersion = (await res.json()).version;
 } catch (err) {

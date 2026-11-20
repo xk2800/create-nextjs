@@ -38,7 +38,7 @@ if (LOCAL) {
   target = process.argv[3].replace(/^v/, '');
 } else {
   try {
-    const res = await fetch(`https://registry.npmjs.org/${TEMPLATE_PKG}/${TEMPLATE_TAG}`);
+    const res = await fetch(`https://registry.npmjs.org/${TEMPLATE_PKG}/${TEMPLATE_TAG}`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`registry responded ${res.status}`);
     target = (await res.json()).version;
   } catch (err) {
