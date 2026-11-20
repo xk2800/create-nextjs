@@ -223,9 +223,8 @@ const edit = (file, pattern, replacement) => {
   const path = join(targetDir, file);
   const before = readFileSync(path, 'utf-8');
   const after = before.replace(pattern, replacement);
-  if (after === before) {
-    s.stop('failed'); p.cancel(`Template changed: could not patch ${file}. Please report this.`); process.exit(1);
-  }
+  // throw, not exit: the catch below removes the half-built folder
+  if (after === before) throw new Error(`Template changed: could not patch ${file}. Please report this.`);
   writeFileSync(path, after);
 };
 edit('next.config.ts', /(const nextConfig: NextConfig = \{\n)/, `$1  transpilePackages: ["${TEMPLATE_PKG}"],\n`);
@@ -258,7 +257,8 @@ for (const [file, pattern] of [
   ['components/site/site-header.tsx', /\s*<Link\s+href="\/features"[\s\S]*?<\/Link>/],
   ['components/site/site-footer.tsx', /\s*<Link\s+href="\/features"[\s\S]*?<\/Link>/],
 ]) {
-  if (existsSync(join(targetDir, file))) edit(file, pattern, '');
+  // Cosmetic: a leftover link 404s but the app works, so warn instead of failing.
+  if (existsSync(join(targetDir, file))) try { edit(file, pattern, ''); } catch (err) { p.log.warn(err.message); }
 }
 if (!modules.includes('docker')) {
   rmSync(join(targetDir, 'Dockerfile'), { force: true });
