@@ -41,7 +41,7 @@ test('patches the fixture template', () => {
     expect(pkg.scripts.test).toBe('bun test');
     expect(pkg.scripts['dev:doppler']).toBeUndefined();
     expect(pkg.devDependencies.tsup).toBeUndefined();
-    for (const gone of ['.github', 'tsup.config.ts']) expect(existsSync(join(dir, gone))).toBe(false);
+    for (const gone of ['.github', 'maintainer notes', '.create-nextjs-ignore', 'tsup.config.ts']) expect(existsSync(join(dir, gone))).toBe(false);
   } finally { done(); }
 });
 
@@ -54,8 +54,21 @@ test('fails loudly when a required patch no longer matches', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('refuses .create-nextjs-ignore entries outside the project', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'create-nextjs-test-'));
+  try {
+    cpSync(join(import.meta.dir, 'fixture'), dir, { recursive: true });
+    writeFileSync(join(dir, '.create-nextjs-ignore'), '..\n');
+    expect(() => patchTemplate(dir, opts)).toThrow('not inside the project');
+    expect(existsSync(dir)).toBe(true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 // Catches real template drift: CREATE_NEXTJS_LOCAL=../nextjs-template bun test
 test.skipIf(!LOCAL)('patches the real template at CREATE_NEXTJS_LOCAL', () => {
-  const { read, done } = scaffold(LOCAL);
-  try { expectCommon(read); } finally { done(); }
+  const { dir, read, done } = scaffold(LOCAL);
+  try {
+    expectCommon(read);
+    for (const gone of ['.github', 'gemini files', '.create-nextjs-ignore']) expect(existsSync(join(dir, gone))).toBe(false);
+  } finally { done(); }
 });

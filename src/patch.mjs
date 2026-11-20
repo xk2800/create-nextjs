@@ -3,7 +3,7 @@
 import * as p from '@clack/prompts';
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { TEMPLATE_PKG, LOCAL, LOCAL_TGZ } from './common.mjs';
 
 // Scaffolded apps depend on the template package, so a version bump is how
@@ -43,19 +43,20 @@ function packageProvidedFiles(dir, tplPkg) {
 }
 
 export function patchTemplate(targetDir, { pkgName, templateVersion, modules, dbDriver, adminEmail }) {
-  rmSync(join(targetDir, '.github'), { recursive: true, force: true }); // template-maintainer usage, not for scaffolded projects
-  rmSync(join(targetDir, 'PUBLISHING.md'), { force: true }); // template-maintainer doc, not for scaffolded projects
-  rmSync(join(targetDir, 'docs'), { recursive: true, force: true }); // the template's own docs site, not for scaffolded projects
-  rmSync(join(targetDir, 'scripts/bump-version.ts'), { force: true }); // template-maintainer tool, not for scaffolded projects
-  rmSync(join(targetDir, 'scripts/bump-version.test.ts'), { force: true });
-  // The template's Storybook (stories + mocks of its internals) — not for scaffolded projects.
-  rmSync(join(targetDir, '.storybook'), { recursive: true, force: true });
-  rmSync(join(targetDir, 'stories'), { recursive: true, force: true });
-  // Template-maintainer docs, release assets and QA scripts — not for scaffolded projects.
-  for (const f of ['SPEC.md', 'REVIEW-CHECKLIST.md', 'features-test.md', 'Dockerfile-old', 'Dockerfile.storybook',
-    'scripts/loadtest-throttle.ts', 'scripts/test-2fa.ts', 'scripts/test-new-device.ts']) rmSync(join(targetDir, f), { force: true });
-  rmSync(join(targetDir, 'brag-output'), { recursive: true, force: true });
-  rmSync(join(targetDir, 'gemini files'), { recursive: true, force: true }); // AI redesign plans, maintainer-only
+  // Template-maintainer files (CI, docs site, Storybook, QA scripts...). The template lists them in
+  // .create-nextjs-ignore so a new one is dropped without a CLI release; the fallback covers tags that predate it.
+  const ignoreFile = join(targetDir, '.create-nextjs-ignore');
+  const maintainerOnly = existsSync(ignoreFile)
+    ? [...readFileSync(ignoreFile, 'utf-8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')), '.create-nextjs-ignore']
+    : ['.github', 'PUBLISHING.md', 'docs', 'scripts/bump-version.ts', 'scripts/bump-version.test.ts', '.storybook', 'stories',
+      'SPEC.md', 'REVIEW-CHECKLIST.md', 'features-test.md', 'Dockerfile-old', 'Dockerfile.storybook', 'scripts/loadtest-throttle.ts',
+      'scripts/test-2fa.ts', 'scripts/test-new-device.ts', 'brag-output', 'gemini files'];
+  for (const f of maintainerOnly) {
+    const path = resolve(targetDir, f);
+    // An entry like "..", "/" or "." would delete outside (or all of) the new project.
+    if (!path.startsWith(resolve(targetDir) + sep)) throw new Error(`.create-nextjs-ignore: "${f}" is not inside the project`);
+    rmSync(path, { recursive: true, force: true });
+  }
   for (const file of ['README.md', 'CLAUDE.md']) {
     const path = join(targetDir, file);
     // Also drop CLAUDE.md's "update docs/SPEC/features-test" rule — it points at files deleted above.
