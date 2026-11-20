@@ -68,7 +68,9 @@ async function main() {
   if (p.isCancel(bumpType)) return p.cancel('Aborted.');
 
   // Gate before the version commit/tag exist; Bun.$ throws on failure and main().catch exits.
-  await run`bun test`;
+  // Output is piped (not a TTY), so bun test drops colors unless forced.
+  console.log('\n$ bun test');
+  await Bun.$`bun test`.env({ ...process.env, FORCE_COLOR: '1' });
 
   const status = (await Bun.$`git status --porcelain`.text()).trim();
   if (status) {
