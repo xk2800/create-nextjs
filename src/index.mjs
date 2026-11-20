@@ -184,8 +184,9 @@ if (cloneDir !== targetDir) {
     renameSync(join(cloneDir, entry), join(targetDir, entry));
   }
   rmSync(cloneDir, { recursive: true, force: true });
+} else {
+  rmSync(join(targetDir, '.git'), { recursive: true, force: true }); // the template's own history; with leftovers the user's .git must survive
 }
-rmSync(join(targetDir, '.git'), { recursive: true, force: true });
 rmSync(join(targetDir, '.github'), { recursive: true, force: true }); // template-maintainer usage, not for scaffolded projects
 rmSync(join(targetDir, 'PUBLISHING.md'), { force: true }); // template-maintainer doc, not for scaffolded projects
 rmSync(join(targetDir, 'docs'), { recursive: true, force: true }); // the template's own docs site, not for scaffolded projects
