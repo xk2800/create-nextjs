@@ -107,8 +107,9 @@ const dbDriver = await p.select({
     { value: 'neon', label: 'neon — Neon serverless (production)' },
   ],
 });
+if (p.isCancel(dbDriver)) { p.cancel('Cancelled'); process.exit(0); }
 
-const adminEmail = await p.text({
+const adminEmail =await p.text({
   message: 'Email for the first admin account (leave blank to skip)',
   placeholder: 'you@example.com',
   defaultValue: '',
@@ -125,6 +126,7 @@ const modules = await p.multiselect({
   ],
   required: false,
 });
+if (p.isCancel(modules)) { p.cancel('Cancelled'); process.exit(0); }
 
 // --- clone ---
 // `git clone` refuses to write into a directory that already contains
