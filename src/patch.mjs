@@ -70,7 +70,9 @@ export function removeFailed(cloneDir, targetDir, isUserFolder) {
 
 export function patchTemplate(targetDir, { pkgName, templateVersion, modules, dbDriver, adminEmail }) {
   // Template-maintainer files (CI, docs site, Storybook, QA scripts...). The template lists them in
-  // .create-nextjs-ignore so a new one is dropped without a CLI release; the fallback covers tags that predate it.
+  // .create-nextjs-ignore so a new one is dropped without a CLI release.
+  // shortcut: the fallback duplicates that list for template tags without the file (latest 0.7.0, beta 0.7.2-beta.7);
+  // delete it once both npm dist-tags point at a version that has .create-nextjs-ignore.
   const ignoreFile = join(targetDir, '.create-nextjs-ignore');
   const maintainerOnly = existsSync(ignoreFile)
     ? [...readFileSync(ignoreFile, 'utf-8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')), '.create-nextjs-ignore']
