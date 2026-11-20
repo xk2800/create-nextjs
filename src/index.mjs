@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as p from '@clack/prompts';
 import { execa } from 'execa';
-import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, rmSync, cpSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, renameSync, rmSync, cpSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -155,7 +155,13 @@ if (!LOCAL) try {
 if (cloneDir !== targetDir) {
   for (const entry of readdirSync(cloneDir)) {
     if (entry === '.git') continue;
-    renameSync(join(cloneDir, entry), join(targetDir, entry));
+    const dest = join(targetDir, entry);
+    if (existsSync(dest)) {
+      // Keep the user's file, but still add the template's rules: they keep .env.development (the auth secret) and node_modules out of the initial commit.
+      if (entry === '.gitignore' || entry === '.gitattributes') appendFileSync(dest, '\n' + readFileSync(join(cloneDir, entry), 'utf-8'));
+      continue;
+    }
+    renameSync(join(cloneDir, entry), dest);
   }
   rmSync(cloneDir, { recursive: true, force: true });
 } else {
@@ -209,6 +215,7 @@ p.outro(`cd ${projectName} && bun dev`);
   s.stop('failed');
   // "." is the user's own directory — never delete it.
   if (projectName !== '.') rmSync(targetDir, { recursive: true, force: true });
+  else if (cloneDir !== targetDir) rmSync(cloneDir, { recursive: true, force: true }); // scratch dir inside "."
   p.cancel([err.shortMessage || err.message, err.stderr].filter(Boolean).join('\n'));
   process.exit(1);
 }
