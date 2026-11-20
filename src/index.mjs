@@ -199,6 +199,7 @@ rmSync(join(targetDir, 'stories'), { recursive: true, force: true });
 for (const f of ['SPEC.md', 'REVIEW-CHECKLIST.md', 'features-test.md', 'Dockerfile-old', 'Dockerfile.storybook',
   'scripts/loadtest-throttle.ts', 'scripts/test-2fa.ts', 'scripts/test-new-device.ts']) rmSync(join(targetDir, f), { force: true });
 rmSync(join(targetDir, 'brag-output'), { recursive: true, force: true });
+rmSync(join(targetDir, 'gemini files'), { recursive: true, force: true }); // AI redesign plans, maintainer-only
 for (const file of ['README.md', 'CLAUDE.md']) {
   const path = join(targetDir, file);
   // Also drop CLAUDE.md's "update docs/SPEC/features-test" rule — it points at files deleted above.
