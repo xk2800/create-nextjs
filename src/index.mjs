@@ -209,12 +209,18 @@ const tplPkg = JSON.parse(readFileSync(join(targetDir, 'package.json'), 'utf-8')
 for (const [file, specifier] of packageProvidedFiles(targetDir, tplPkg)) shim(join(targetDir, file), specifier);
 // The package ships its components as .tsx source, so Next must compile them,
 // and Tailwind v4 skips node_modules when scanning for class names.
-const nextConfigPath = join(targetDir, 'next.config.ts');
-writeFileSync(nextConfigPath, readFileSync(nextConfigPath, 'utf-8')
-  .replace(/(const nextConfig: NextConfig = \{\n)/, `$1  transpilePackages: ["${TEMPLATE_PKG}"],\n`));
-const cssPath = join(targetDir, 'app/globals.css');
-writeFileSync(cssPath, readFileSync(cssPath, 'utf-8')
-  .replace('@import "tailwindcss";\n', `@import "tailwindcss";\n@source "../node_modules/${TEMPLATE_PKG}";\n`));
+// Fail loudly if the template changed and a pattern no longer matches.
+const edit = (file, pattern, replacement) => {
+  const path = join(targetDir, file);
+  const before = readFileSync(path, 'utf-8');
+  const after = before.replace(pattern, replacement);
+  if (after === before) {
+    s.stop('failed'); p.cancel(`Template changed: could not patch ${file}. Please report this.`); process.exit(1);
+  }
+  writeFileSync(path, after);
+};
+edit('next.config.ts', /(const nextConfig: NextConfig = \{\n)/, `$1  transpilePackages: ["${TEMPLATE_PKG}"],\n`);
+edit('app/globals.css', '@import "tailwindcss";\n', `@import "tailwindcss";\n@source "../node_modules/${TEMPLATE_PKG}";\n`);
 // The `exports` map, tsup, and tsconfig.build.json only exist so the
 // template repo can itself be published as a library — a scaffolded app
 // consumes that library and never builds a dist/ of its own.
@@ -243,8 +249,7 @@ for (const [file, pattern] of [
   ['components/site/site-header.tsx', /\s*<Link\s+href="\/features"[\s\S]*?<\/Link>/],
   ['components/site/site-footer.tsx', /\s*<Link\s+href="\/features"[\s\S]*?<\/Link>/],
 ]) {
-  const path = join(targetDir, file);
-  if (existsSync(path)) writeFileSync(path, readFileSync(path, 'utf-8').replace(pattern, ''));
+  if (existsSync(join(targetDir, file))) edit(file, pattern, '');
 }
 if (!modules.includes('docker')) {
   rmSync(join(targetDir, 'Dockerfile'), { force: true });
