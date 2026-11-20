@@ -154,14 +154,22 @@ export function patchTemplate(targetDir, { pkgName, templateVersion, modules, db
   const port = 3000;
   const authSecret = randomBytes(32).toString('base64');
   let env = readFileSync(join(targetDir, '.env.development.example'), 'utf-8');
-  env = env
-    .replace(/^PORT=$/m, `PORT=${port}`)
-    .replace(/^BASE_URL=$/m, `BASE_URL=http://localhost:${port}`)
-    .replace(/^BETTER_AUTH_URL=$/m, `BETTER_AUTH_URL=http://localhost:${port}`)
-    .replace(/^BETTER_AUTH_SECRET=$/m, `BETTER_AUTH_SECRET=${authSecret}`);
+  // Replaces the whole line (so `KEY=""` or `KEY= # note` still work) and fails loudly if the key
+  // is gone: a silent miss ships a blank auth secret. Function replacement keeps `$` in values literal.
+  const setEnv = (key, value) => {
+    const line = new RegExp(`^${key}=.*$`, 'm');
+    if (!line.test(env)) throw new Error(`Template changed: no ${key}= line in .env.development.example. Please report this.`);
+    env = env.replace(line, () => `${key}=${value}`);
+  };
+  setEnv('PORT', port);
+  setEnv('BASE_URL', `http://localhost:${port}`);
+  setEnv('BETTER_AUTH_URL', `http://localhost:${port}`);
+  setEnv('BETTER_AUTH_SECRET', authSecret);
   if (dbDriver !== 'pg') {
-    env = env.replace(/^DATABASE_URL=$/m, `DATABASE_URL=\nDB_DRIVER=${dbDriver}`);
+    // The example has no DB_DRIVER line (zod defaults to pg), so add one under DATABASE_URL.
+    if (/^DB_DRIVER=/m.test(env)) setEnv('DB_DRIVER', dbDriver);
+    else { setEnv('DATABASE_URL', ''); env = env.replace(/^DATABASE_URL=$/m, () => `DATABASE_URL=\nDB_DRIVER=${dbDriver}`); }
   }
-  if (adminEmail) env = env.replace(/^ADMIN_EMAIL=$/m, `ADMIN_EMAIL=${adminEmail}`);
+  if (adminEmail) setEnv('ADMIN_EMAIL', adminEmail);
   writeFileSync(join(targetDir, '.env.development'), env);
 }

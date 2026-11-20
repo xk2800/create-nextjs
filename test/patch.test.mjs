@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { patchTemplate } from '../src/patch.mjs';
 import { TEMPLATE_PKG, LOCAL } from '../src/common.mjs';
 
-const opts = { pkgName: 'my-app', templateVersion: '1.2.3', modules: [], dbDriver: 'neon', adminEmail: 'a@b.co' };
+const opts = { pkgName: 'my-app', templateVersion: '1.2.3', modules: [], dbDriver: 'neon', adminEmail: 'a$&$1@b.co' }; // `$` patterns must stay literal
 
 // Copy a template into a temp dir, patch it, hand back a reader for the result.
 function scaffold(src) {
@@ -35,7 +35,8 @@ test('patches the fixture template', () => {
     expect(read('components/ui/button.tsx')).toBe(`export * from '${TEMPLATE_PKG}/components/ui/button';\n`);
     expect(read('app/page.tsx')).not.toContain('/features');
     expect(read('.env.development')).toContain('DATABASE_URL=\nDB_DRIVER=neon\n');
-    expect(read('.env.development')).toContain('ADMIN_EMAIL=a@b.co');
+    expect(read('.env.development')).toContain('ADMIN_EMAIL=a$&$1@b.co\n');
+    expect(read('.env.development')).toStartWith('PORT=3000\n'); // trailing comment replaced too
     const pkg = JSON.parse(read('package.json'));
     expect(pkg.dependencies[TEMPLATE_PKG]).toBe(LOCAL ? 'file:./nextjs-template-local.tgz' : '^1.2.3');
     expect(pkg.scripts.test).toBe('bun test');
@@ -51,6 +52,15 @@ test('fails loudly when a required patch no longer matches', () => {
     cpSync(join(import.meta.dir, 'fixture'), dir, { recursive: true });
     writeFileSync(join(dir, 'next.config.ts'), 'export default {};\n');
     expect(() => patchTemplate(dir, opts)).toThrow('could not patch next.config.ts');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('fails loudly when the env example loses a key', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'create-nextjs-test-'));
+  try {
+    cpSync(join(import.meta.dir, 'fixture'), dir, { recursive: true });
+    writeFileSync(join(dir, '.env.development.example'), 'PORT=\nBASE_URL=\nBETTER_AUTH_URL=\nDATABASE_URL=\n');
+    expect(() => patchTemplate(dir, opts)).toThrow('no BETTER_AUTH_SECRET= line');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
