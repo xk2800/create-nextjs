@@ -1,0 +1,8 @@
+{
+  "name": "@xk2800/nextjs-template",
+  "version": "1.2.3",
+  "scripts": { "test": "bun test && bun scripts/bump-version.test.ts", "dev:doppler": "doppler run -- next dev", "build:lib": "tsup" },
+  "exports": { "./lib/util": "./lib/util.ts" },
+  "files": ["components/ui"],
+  "devDependencies": { "tsup": "^8.0.0" }
+}
