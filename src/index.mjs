@@ -2,7 +2,8 @@
 import * as p from '@clack/prompts';
 import { execa } from 'execa';
 import { randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, renameSync, rmSync, cpSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, renameSync, rmSync, cpSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TEMPLATE_PKG, TEMPLATE_TAG, LOCAL, LOCAL_TGZ, packLocal } from './common.mjs';
@@ -171,10 +172,15 @@ if (!LOCAL) try {
       redirect: 'follow',
     });
     if (!res.ok) { s.stop('failed'); p.cancel(`download failed: ${res.status}`); process.exit(1); }
-    writeFileSync('template.tar.gz', Buffer.from(await res.arrayBuffer()));
-    await execa('mkdir', ['-p', cloneDir]);
-    await execa('tar', ['-xzf', 'template.tar.gz', '--strip-components=1', '-C', cloneDir]);
-    rmSync('template.tar.gz');
+    const tmp = mkdtempSync(join(tmpdir(), 'create-nextjs-'));
+    const archive = join(tmp, 'template.tar.gz');
+    writeFileSync(archive, Buffer.from(await res.arrayBuffer()));
+    mkdirSync(cloneDir, { recursive: true });
+    try {
+      await execa('tar', ['-xzf', archive, '--strip-components=1', '-C', cloneDir]);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   } else {
     s.stop('failed');
     p.cancel(err.message);
