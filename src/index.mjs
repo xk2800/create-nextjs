@@ -135,6 +135,8 @@ if (!LOCAL) try {
     const res = await fetch(`https://api.github.com/repos/xk2800/nextjs-template/tarball/${templateRef}`, {
       headers: process.env.GITHUB_TOKEN ? { Authorization: `token ${process.env.GITHUB_TOKEN}` } : {},
       redirect: 'follow',
+      // Covers the body download too, so longer than the registry calls' 5s.
+      signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) { s.stop('failed'); p.cancel(`download failed: ${res.status}`); process.exit(1); }
     const tmp = mkdtempSync(join(tmpdir(), 'create-nextjs-'));
