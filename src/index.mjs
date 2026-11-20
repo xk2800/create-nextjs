@@ -91,7 +91,10 @@ try { await execa('bun', ['--version']); } catch {
   p.cancel('bun is required but was not found. Install it from https://bun.sh'); process.exit(1);
 }
 
-const projectName = await p.text({ message: 'Project name', placeholder: 'my-app', defaultValue: 'my-app' });
+const projectName = await p.text({ message: 'Project name', placeholder: 'my-app', defaultValue: 'my-app',
+  // Becomes both a folder path and the npm package name: no "..", slashes, spaces or capitals.
+  validate: (v) => (v && !/^(\.|[a-z0-9][a-z0-9._-]*)$/.test(v) ? 'Use lowercase letters, numbers, ".", "_" or "-" (or "." for the current folder)' : undefined),
+});
 if (p.isCancel(projectName)) { p.cancel('Cancelled'); process.exit(0); }
 const targetDir = join(process.cwd(), projectName);
 const pkgName = projectName === '.' ? basename(resolve(targetDir)) : projectName;
