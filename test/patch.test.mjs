@@ -1,8 +1,8 @@
 import { test, expect } from 'bun:test';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { patchTemplate } from '../src/patch.mjs';
+import { patchTemplate, moveIntoTarget, removeFailed } from '../src/patch.mjs';
 import { TEMPLATE_PKG, LOCAL } from '../src/common.mjs';
 
 const opts = { pkgName: 'my-app', templateVersion: '1.2.3', modules: [], dbDriver: 'neon', adminEmail: 'a$&$1@b.co' }; // `$` patterns must stay literal
@@ -72,6 +72,55 @@ test('refuses .create-nextjs-ignore entries outside the project', () => {
     expect(() => patchTemplate(dir, opts)).toThrow('not inside the project');
     expect(existsSync(dir)).toBe(true);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// Scaffolding into "." with leftovers: the template lands in a scratch dir inside the user's folder.
+function userFolderWithClone() {
+  const target = mkdtempSync(join(tmpdir(), 'create-nextjs-test-'));
+  mkdirSync(join(target, '.git'));
+  writeFileSync(join(target, '.git/HEAD'), 'ref: refs/heads/mine\n');
+  writeFileSync(join(target, '.gitignore'), 'my-secret.txt\n');
+  const clone = join(target, '.create-nextjs-1');
+  mkdirSync(join(clone, '.git'), { recursive: true });
+  writeFileSync(join(clone, '.git/HEAD'), 'ref: refs/heads/template\n');
+  writeFileSync(join(clone, '.gitignore'), '.env.development\n/node_modules\n');
+  writeFileSync(join(clone, 'package.json'), '{}\n');
+  return { target, clone };
+}
+
+test('merging into the user folder keeps their .git and .gitignore', () => {
+  const { target, clone } = userFolderWithClone();
+  try {
+    moveIntoTarget(clone, target);
+    expect(readFileSync(join(target, '.git/HEAD'), 'utf-8')).toBe('ref: refs/heads/mine\n');
+    expect(readFileSync(join(target, '.gitignore'), 'utf-8')).toBe('my-secret.txt\n\n.env.development\n/node_modules\n');
+    expect(existsSync(join(target, 'package.json'))).toBe(true);
+    expect(existsSync(clone)).toBe(false);
+  } finally { rmSync(target, { recursive: true, force: true }); }
+});
+
+test('a plain clone only loses the template .git', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'create-nextjs-test-'));
+  try {
+    mkdirSync(join(dir, '.git'));
+    writeFileSync(join(dir, 'package.json'), '{}\n');
+    moveIntoTarget(dir, dir);
+    expect(existsSync(join(dir, '.git'))).toBe(false);
+    expect(existsSync(join(dir, 'package.json'))).toBe(true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('failure cleanup never deletes the user folder', () => {
+  const { target, clone } = userFolderWithClone();
+  try {
+    removeFailed(clone, target, true);
+    expect(existsSync(clone)).toBe(false);
+    expect(readFileSync(join(target, '.git/HEAD'), 'utf-8')).toBe('ref: refs/heads/mine\n');
+    removeFailed(target, target, true); // "." with no leftovers: clone dir is the user folder itself
+    expect(existsSync(join(target, '.gitignore'))).toBe(true);
+    removeFailed(target, target, false); // a new project folder is removed
+    expect(existsSync(target)).toBe(false);
+  } finally { rmSync(target, { recursive: true, force: true }); }
 });
 
 // Catches real template drift: CREATE_NEXTJS_LOCAL=../nextjs-template bun test

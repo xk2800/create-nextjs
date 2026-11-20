@@ -67,6 +67,9 @@ async function main() {
   });
   if (p.isCancel(bumpType)) return p.cancel('Aborted.');
 
+  // Gate before the version commit/tag exist; Bun.$ throws on failure and main().catch exits.
+  await run`bun test`;
+
   const status = (await Bun.$`git status --porcelain`.text()).trim();
   if (status) {
     console.log('\nUncommitted changes:');

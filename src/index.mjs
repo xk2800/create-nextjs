@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import * as p from '@clack/prompts';
 import { execa } from 'execa';
-import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, renameSync, rmSync, cpSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, cpSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TEMPLATE_PKG, TEMPLATE_TAG, LOCAL, packLocal } from './common.mjs';
-import { patchTemplate } from './patch.mjs';
+import { patchTemplate, moveIntoTarget, removeFailed } from './patch.mjs';
 
 // Override for local testing: CREATE_NEXTJS_REPO=/path/to/local/clone
 const REPO = process.env.CREATE_NEXTJS_REPO || 'https://github.com/xk2800/nextjs-template.git';
@@ -154,21 +154,7 @@ if (!LOCAL) try {
     process.exit(1);
   }
 }
-if (cloneDir !== targetDir) {
-  for (const entry of readdirSync(cloneDir)) {
-    if (entry === '.git') continue;
-    const dest = join(targetDir, entry);
-    if (existsSync(dest)) {
-      // Keep the user's file, but still add the template's rules: they keep .env.development (the auth secret) and node_modules out of the initial commit.
-      if (entry === '.gitignore' || entry === '.gitattributes') appendFileSync(dest, '\n' + readFileSync(join(cloneDir, entry), 'utf-8'));
-      continue;
-    }
-    renameSync(join(cloneDir, entry), dest);
-  }
-  rmSync(cloneDir, { recursive: true, force: true });
-} else {
-  rmSync(join(targetDir, '.git'), { recursive: true, force: true }); // the template's own history; with leftovers the user's .git must survive
-}
+moveIntoTarget(cloneDir, targetDir);
 patchTemplate(targetDir, { pkgName, templateVersion, modules, dbDriver, adminEmail });
 await execa('git', ['init'], { cwd: targetDir });
 s.stop('Cloned');
@@ -215,9 +201,7 @@ p.note(notes.join('\n'), 'Next steps');
 p.outro(`cd ${projectName} && bun dev`);
 } catch (err) {
   s.stop('failed');
-  // "." is the user's own directory — never delete it.
-  if (projectName !== '.') rmSync(targetDir, { recursive: true, force: true });
-  else if (cloneDir !== targetDir) rmSync(cloneDir, { recursive: true, force: true }); // scratch dir inside "."
+  removeFailed(cloneDir, targetDir, projectName === '.');
   p.cancel([err.shortMessage || err.message, err.stderr].filter(Boolean).join('\n'));
   process.exit(1);
 }

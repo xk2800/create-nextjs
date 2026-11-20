@@ -2,7 +2,7 @@
 // index.mjs so test/patch.test.mjs can run them without prompts, git or network.
 import * as p from '@clack/prompts';
 import { randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, renameSync, rmSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { TEMPLATE_PKG, LOCAL, LOCAL_TGZ } from './common.mjs';
 
@@ -40,6 +40,32 @@ function packageProvidedFiles(dir, tplPkg) {
   };
   for (const f of tplPkg.files ?? []) if (f.startsWith('components/') && existsSync(join(dir, f))) walk(f);
   return provided.filter(([f]) => existsSync(join(dir, f)));
+}
+
+// cloneDir is a scratch dir inside targetDir when targetDir already had (ignorable) files,
+// otherwise the same folder. Either way the user's own files and .git must survive.
+export function moveIntoTarget(cloneDir, targetDir) {
+  if (cloneDir === targetDir) {
+    rmSync(join(targetDir, '.git'), { recursive: true, force: true }); // the template's own history
+    return;
+  }
+  for (const entry of readdirSync(cloneDir)) {
+    if (entry === '.git') continue;
+    const dest = join(targetDir, entry);
+    if (existsSync(dest)) {
+      // Keep the user's file, but still add the template's rules: they keep .env.development (the auth secret) and node_modules out of the initial commit.
+      if (entry === '.gitignore' || entry === '.gitattributes') appendFileSync(dest, '\n' + readFileSync(join(cloneDir, entry), 'utf-8'));
+      continue;
+    }
+    renameSync(join(cloneDir, entry), dest);
+  }
+  rmSync(cloneDir, { recursive: true, force: true });
+}
+
+// After a failed scaffold: delete the new project folder, but never the user's own "." folder.
+export function removeFailed(cloneDir, targetDir, isUserFolder) {
+  if (!isUserFolder) rmSync(targetDir, { recursive: true, force: true });
+  else if (cloneDir !== targetDir) rmSync(cloneDir, { recursive: true, force: true }); // scratch dir inside "."
 }
 
 export function patchTemplate(targetDir, { pkgName, templateVersion, modules, dbDriver, adminEmail }) {
