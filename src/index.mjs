@@ -87,6 +87,10 @@ if (process.argv[2] === 'upgrade') {
   process.exit(0);
 }
 
+try { await execa('bun', ['--version']); } catch {
+  p.cancel('bun is required but was not found. Install it from https://bun.sh'); process.exit(1);
+}
+
 const projectName = await p.text({ message: 'Project name', placeholder: 'my-app', defaultValue: 'my-app' });
 if (p.isCancel(projectName)) { p.cancel('Cancelled'); process.exit(0); }
 const targetDir = join(process.cwd(), projectName);
@@ -137,6 +141,8 @@ const hasLeftovers = existsSync(targetDir) && readdirSync(targetDir).length > 0;
 const cloneDir = hasLeftovers ? join(targetDir, `.create-nextjs-${Date.now()}`) : targetDir;
 
 const s = p.spinner();
+// Everything below runs in this try so a failed git/bun call cleans up after itself.
+try {
 s.start('Cloning template');
 // Clone the tag of the latest published package, not a branch tip: the local
 // files (routes, shims below) must line up with the package version installed.
@@ -352,3 +358,10 @@ notes.push('bun run migrate:dev');
 notes.push('Template updates: bunx @xk2800/create-nextjs upgrade');
 p.note(notes.join('\n'), 'Next steps');
 p.outro(`cd ${projectName} && bun dev`);
+} catch (err) {
+  s.stop('failed');
+  // "." is the user's own directory — never delete it.
+  if (projectName !== '.') rmSync(targetDir, { recursive: true, force: true });
+  p.cancel(err.shortMessage || err.message);
+  process.exit(1);
+}
